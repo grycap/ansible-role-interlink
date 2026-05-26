@@ -1,0 +1,19 @@
+[Unit]
+Description=interLink Slurm plugin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ interlink_service_user }}
+Group={{ interlink_service_group }}
+WorkingDirectory={{ interlink_work_dir }}
+Environment=HOME={{ interlink_home_dir }}
+Environment=SLURMCONFIGPATH={{ interlink_base_dir }}/config/SlurmConfig.yaml
+Environment=SHARED_FS=true
+ExecStart={{ interlink_base_dir }}/bin/interlink-sidecar-slurm
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

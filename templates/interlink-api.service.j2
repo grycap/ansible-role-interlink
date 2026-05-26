@@ -1,0 +1,19 @@
+[Unit]
+Description=interLink API server with mTLS
+After=network-online.target interlink-slurm-plugin.service
+Wants=network-online.target
+Requires=interlink-slurm-plugin.service
+
+[Service]
+Type=simple
+User={{ interlink_service_user }}
+Group={{ interlink_service_group }}
+WorkingDirectory={{ interlink_work_dir }}
+Environment=HOME={{ interlink_home_dir }}
+Environment=INTERLINKCONFIGPATH={{ interlink_base_dir }}/config/InterLinkConfig.yaml
+ExecStart={{ interlink_base_dir }}/bin/interlink
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

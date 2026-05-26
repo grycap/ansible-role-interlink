@@ -1,0 +1,104 @@
+---
+- name: Generate mTLS CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ interlink_base_dir }}/certs/ca-key.pem"
+    type: RSA
+    size: 4096
+    mode: "0600"
+
+- name: Generate mTLS CA certificate
+  community.crypto.openssl_csr:
+    path: "{{ interlink_base_dir }}/certs/ca.csr"
+    privatekey_path: "{{ interlink_base_dir }}/certs/ca-key.pem"
+    country_name: ES
+    organization_name: interLink
+    common_name: "{{ interlink_node_name }}-ca"
+    basic_constraints:
+      - "CA:TRUE"
+    key_usage:
+      - keyCertSign
+      - cRLSign
+    mode: "0644"
+
+- name: Generate mTLS CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ interlink_base_dir }}/certs/ca.pem"
+    csr_path: "{{ interlink_base_dir }}/certs/ca.csr"
+    privatekey_path: "{{ interlink_base_dir }}/certs/ca-key.pem"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ interlink_tls_cert_days }}d"
+    mode: "0644"
+
+- name: Generate server private key
+  community.crypto.openssl_privatekey:
+    path: "{{ interlink_base_dir }}/certs/server-key.pem"
+    type: RSA
+    size: 4096
+    mode: "0600"
+
+- name: Generate server CSR
+  community.crypto.openssl_csr:
+    path: "{{ interlink_base_dir }}/certs/server.csr"
+    privatekey_path: "{{ interlink_base_dir }}/certs/server-key.pem"
+    country_name: ES
+    organization_name: interLink
+    common_name: "{{ interlink_edge_ip }}"
+    subject_alt_name:
+      - "IP:{{ interlink_edge_ip }}"
+      - "DNS:{{ interlink_edge_hostname }}"
+      - "DNS:localhost"
+      - "IP:127.0.0.1"
+    extended_key_usage:
+      - serverAuth
+    mode: "0644"
+
+- name: Generate server certificate signed by local CA
+  community.crypto.x509_certificate:
+    path: "{{ interlink_base_dir }}/certs/server-cert.pem"
+    csr_path: "{{ interlink_base_dir }}/certs/server.csr"
+    ownca_path: "{{ interlink_base_dir }}/certs/ca.pem"
+    ownca_privatekey_path: "{{ interlink_base_dir }}/certs/ca-key.pem"
+    provider: ownca
+    ownca_not_after: "+{{ interlink_tls_cert_days }}d"
+    ownca_create_authority_key_identifier: true
+    ownca_create_subject_key_identifier: create_if_not_provided
+    mode: "0644"
+
+- name: Generate client private key
+  community.crypto.openssl_privatekey:
+    path: "{{ interlink_base_dir }}/certs/client-key.pem"
+    type: RSA
+    size: 4096
+    mode: "0600"
+
+- name: Generate client CSR
+  community.crypto.openssl_csr:
+    path: "{{ interlink_base_dir }}/certs/client.csr"
+    privatekey_path: "{{ interlink_base_dir }}/certs/client-key.pem"
+    country_name: ES
+    organization_name: interLink
+    common_name: "{{ interlink_node_name }}"
+    extended_key_usage:
+      - clientAuth
+    mode: "0644"
+
+- name: Generate client certificate signed by local CA
+  community.crypto.x509_certificate:
+    path: "{{ interlink_base_dir }}/certs/client-cert.pem"
+    csr_path: "{{ interlink_base_dir }}/certs/client.csr"
+    ownca_path: "{{ interlink_base_dir }}/certs/ca.pem"
+    ownca_privatekey_path: "{{ interlink_base_dir }}/certs/ca-key.pem"
+    provider: ownca
+    ownca_not_after: "+{{ interlink_tls_cert_days }}d"
+    ownca_create_authority_key_identifier: true
+    ownca_create_subject_key_identifier: create_if_not_provided
+    mode: "0644"
+
+- name: Lock down private key permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0600"
+  loop:
+    - "{{ interlink_base_dir }}/certs/ca-key.pem"
+    - "{{ interlink_base_dir }}/certs/server-key.pem"
+    - "{{ interlink_base_dir }}/certs/client-key.pem"

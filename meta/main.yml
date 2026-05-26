@@ -1,0 +1,32 @@
+---
+galaxy_info:
+  role_name: interlink
+  namespace: grycap
+  author: micafer1@upv.es
+  description: Install and configure InterLink components for Slurm and Kubernetes
+  company: GRyCAP
+  license: Apache-2.0
+  min_ansible_version: "2.12"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+        - noble
+  galaxy_tags:
+    - interlink
+    - kubernetes
+    - slurm
+    - virtualkubelet
+    - hpc
+
+collections:
+  - community.crypto
+
+dependencies:
+  - role: usegalaxy_eu.apptainer
+    when: (interlink_type_of_node | default(type_of_node | default('kubernetes'))) == 'slurm'

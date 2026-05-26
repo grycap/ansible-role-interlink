@@ -1,0 +1,29 @@
+---
+- name: Template interLink and Slurm plugin configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - src: InterLinkConfig.yaml.j2
+      dest: "{{ interlink_base_dir }}/config/InterLinkConfig.yaml"
+    - src: SlurmConfig.yaml.j2
+      dest: "{{ interlink_base_dir }}/config/SlurmConfig.yaml"
+  notify:
+    - Restart interLink API
+    - Restart interLink Slurm plugin
+
+- name: Template systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - src: interlink-api.service.j2
+      dest: interlink-api.service
+    - src: interlink-slurm-plugin.service.j2
+      dest: interlink-slurm-plugin.service
+  notify:
+    - Reload systemd
+    - Restart interLink API
+    - Restart interLink Slurm plugin

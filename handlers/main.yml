@@ -1,0 +1,14 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart interLink Slurm plugin
+  ansible.builtin.systemd:
+    name: interlink-slurm-plugin.service
+    state: restarted
+
+- name: Restart interLink API
+  ansible.builtin.systemd:
+    name: interlink-api.service
+    state: restarted

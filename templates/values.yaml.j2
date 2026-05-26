@@ -1,0 +1,33 @@
+nodeName: {{ interlink_node_name }}
+
+virtualNode:
+  image: {{ virtual_kubelet_image }}
+  resources:
+    CPUs: {{ virtual_node_cpu }}
+    memGiB: {{ virtual_node_memory_gib }}
+    pods: {{ virtual_node_pods }}
+  HTTP:
+    insecure: true
+    CACert: ""
+  kubeletHTTP:
+    insecure: true
+  containerResources:
+    CPU:
+      request: "{{ virtual_kubelet_cpu_request }}"
+      limit: "{{ virtual_kubelet_cpu_limit }}"
+    memory:
+      request: "{{ virtual_kubelet_memory_request }}"
+      limit: "{{ virtual_kubelet_memory_limit }}"
+
+interlink:
+  enabled: false
+  address: {{ interlink_edge_url }}
+  port: {{ interlink_port }}
+  tls:
+    enabled: true
+    certFile: /etc/vk/certs/tls.crt
+    keyFile: /etc/vk/certs/tls.key
+    caCertFile: /etc/vk/certs/ca.crt
+
+OAUTH:
+  enabled: false

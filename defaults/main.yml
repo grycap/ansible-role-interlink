@@ -1,0 +1,48 @@
+---
+interlink_type_of_node: "kubernetes"  # or slurm
+interlink_namespace: interlink
+interlink_node_name: interlink-slurm-vk
+interlink_port: 30443
+interlink_run_smoke_test: false
+
+interlink_base_dir: /opt/interlink
+interlink_data_dir: "{{ interlink_base_dir }}/data"
+interlink_work_dir: "{{ interlink_base_dir }}/work"
+interlink_home_dir: "{{ interlink_base_dir }}/home"
+interlink_service_user: "{{ ansible_user | default('root') }}"
+interlink_service_group: "{{ ansible_user | default('root') }}"
+interlink_socket_path: "{{ interlink_base_dir }}/.plugin.sock"
+interlink_socket_url: "unix://{{ interlink_socket_path }}"
+interlink_artifact_dir: "{{ playbook_dir }}/artifacts/{{ interlink_node_name }}"
+interlink_remote_cert_dir: "/tmp/{{ interlink_node_name }}-certs"
+interlink_edge_ip: "{{ ansible_default_ipv4.address }}"
+interlink_edge_hostname: "{{ ansible_fqdn | default(inventory_hostname) }}"
+interlink_edge_url: "https://{{ interlink_edge_hostname }}"
+interlink_tls_cert_days: 365
+
+interlink_version: 0.6.1-patch1
+interlink_slurm_plugin_version: 0.6.1
+interlink_chart_version: 0.6.1
+virtual_kubelet_image: ghcr.io/interlink-hq/interlink/virtual-kubelet-inttw:0.6.1-patch1
+virtual_kubelet_deployment_name: "{{ interlink_node_name }}-node"
+
+# Backward compatibility with previous variable name.
+type_of_node: "{{ interlink_type_of_node }}"
+
+slurm_partition: debug
+slurm_default_cpu: 1
+slurm_default_memory: 1G
+slurm_job_time: "00:10:00"
+
+virtual_node_cpu: 1
+virtual_node_memory_gib: 1
+virtual_node_pods: 10
+virtual_kubelet_cpu_request: 100m
+virtual_kubelet_cpu_limit: 500m
+virtual_kubelet_memory_request: 128Mi
+virtual_kubelet_memory_limit: 512Mi
+
+kubeconfig_path: /etc/kubernetes/admin.conf
+
+interlink_release_base_url: "https://github.com/interlink-hq/interlink/releases/download/{{ interlink_version }}"
+interlink_slurm_plugin_release_base_url: "https://github.com/interlink-hq/interlink-slurm-plugin/releases/download/{{ interlink_slurm_plugin_version }}"

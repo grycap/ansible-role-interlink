@@ -1,0 +1,29 @@
+Socket: "{{ interlink_socket_url }}"
+SidecarPort: "0"
+SbatchPath: "/usr/bin/sbatch"
+ScancelPath: "/usr/bin/scancel"
+SqueuePath: "/usr/bin/squeue"
+SinfoPath: "/usr/bin/sinfo"
+CommandPrefix: ""
+ImagePrefix: "docker://"
+SingularityPath: "/usr/bin/apptainer"
+SingularityPrefix: ""
+SingularityDefaultOptions: []
+ExportPodData: true
+DataRootFolder: "{{ interlink_data_dir }}/jobs/"
+Namespace: "{{ interlink_namespace }}"
+Tsocks: false
+BashPath: /bin/bash
+VerboseLogging: true
+ErrorsOnlyLogging: false
+EnableProbes: true
+DefaultFlavor: "{{ slurm_partition }}"
+Flavors:
+  {{ slurm_partition }}:
+    Name: "{{ slurm_partition }}"
+    Description: "Default Slurm {{ slurm_partition }} partition"
+    CPUDefault: {{ slurm_default_cpu }}
+    MemoryDefault: "{{ slurm_default_memory }}"
+    SlurmFlags:
+      - "--partition={{ slurm_partition }}"
+      - "--time={{ slurm_job_time }}"

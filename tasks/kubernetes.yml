@@ -1,0 +1,117 @@
+---
+
+- name: Check client mTLS artifacts on Ansible controller
+  ansible.builtin.stat:
+    path: "{{ interlink_artifact_dir }}/{{ item }}"
+  loop:
+    - ca.crt
+    - tls.crt
+    - tls.key
+  register: interlink_artifacts_stat
+  delegate_to: localhost
+
+- name: Ensure client mTLS artifacts are available
+  ansible.builtin.assert:
+    that:
+      - interlink_artifacts_stat.results | map(attribute='stat.exists') | min
+    fail_msg: >-
+      Missing mTLS artifacts under {{ interlink_artifact_dir }}.
+      Run the role first on the Slurm host (interlink_type_of_node=slurm).
+
+- name: Ensure remote certificate directory exists
+  ansible.builtin.file:
+    path: "{{ interlink_remote_cert_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Copy client mTLS artifacts to K8s front
+  ansible.builtin.copy:
+    src: "{{ interlink_artifact_dir }}/{{ item }}"
+    dest: "{{ interlink_remote_cert_dir }}/{{ item }}"
+    mode: "{{ '0600' if item == 'tls.key' else '0644' }}"
+  loop:
+    - ca.crt
+    - tls.crt
+    - tls.key
+
+- name: Ensure interLink namespace exists
+  ansible.builtin.command:
+    cmd: "kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ interlink_namespace }}"
+  register: create_namespace
+  failed_when:
+    - create_namespace.rc != 0
+    - "'AlreadyExists' not in create_namespace.stderr"
+  changed_when: create_namespace.rc == 0
+
+- name: Create or update Virtual Kubelet TLS secret
+  ansible.builtin.shell: >-
+    kubectl create secret generic {{ interlink_node_name }}-tls-certs
+    -n {{ interlink_namespace }}
+    --kubeconfig={{ kubeconfig_path }}
+    --from-file=ca.crt={{ interlink_remote_cert_dir }}/ca.crt
+    --from-file=tls.crt={{ interlink_remote_cert_dir }}/tls.crt
+    --from-file=tls.key={{ interlink_remote_cert_dir }}/tls.key
+    --dry-run=client -o yaml
+    | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+  args:
+    executable: /bin/bash
+  register: tls_secret_apply
+  changed_when: "'configured' in tls_secret_apply.stdout or 'created' in tls_secret_apply.stdout"
+
+- name: Template interLink Helm values
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: "/tmp/{{ interlink_node_name }}-values.yaml"
+    mode: "0600"
+
+- name: Install or upgrade interLink Virtual Kubelet Helm chart
+  ansible.builtin.command:
+    cmd: >-
+      helm upgrade --install {{ interlink_node_name }}
+      oci://ghcr.io/interlink-hq/interlink-helm-chart/interlink
+      --version {{ interlink_chart_version }}
+      --namespace {{ interlink_namespace }}
+      --create-namespace
+      --kubeconfig={{ kubeconfig_path }}
+      --values /tmp/{{ interlink_node_name }}-values.yaml
+  register: helm_upgrade
+  changed_when: "'has been upgraded' in helm_upgrade.stdout or 'has been installed' in helm_upgrade.stdout"
+
+- name: Wait for Virtual Kubelet pod rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig={{ kubeconfig_path }} -n {{ interlink_namespace }}
+      rollout status deployment/{{ virtual_kubelet_deployment_name }} --timeout=180s
+  changed_when: false
+
+- name: Get pending Virtual Kubelet CSRs
+  ansible.builtin.shell: |
+    kubectl --kubeconfig={{ kubeconfig_path }} get csr -o json | jq -r '
+      .items[]
+      | select(.spec.signerName == "kubernetes.io/kubelet-serving")
+      | select(.spec.username == "system:serviceaccount:{{ interlink_namespace }}:{{ interlink_node_name }}")
+      | select((.status.certificate // "") == "")
+      | .metadata.name
+    '
+  args:
+    executable: /bin/bash
+  register: virtual_kubelet_csr_names
+  changed_when: false
+
+- name: Approve pending Virtual Kubelet CSRs
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig={{ kubeconfig_path }} certificate approve {{ item }}
+  loop: "{{ virtual_kubelet_csr_names.stdout_lines }}"
+  when: virtual_kubelet_csr_names.stdout_lines | length > 0
+
+- name: Wait for Virtual Kubelet node to be Ready
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig={{ kubeconfig_path }}
+      wait --for=condition=Ready node/{{ interlink_node_name }} --timeout=180s
+  changed_when: false
+
+- name: Template direct smoke pod manifest
+  include_tasks: k8s_smoke.yml
+  when: interlink_run_smoke_test

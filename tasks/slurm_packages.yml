@@ -1,0 +1,26 @@
+---
+- name: Ensure required OS packages are installed
+  ansible.builtin.package:
+    name:
+      - ca-certificates
+      - curl
+      - jq
+      - openssl
+    state: present
+
+- name: Create interLink directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ interlink_service_user }}"
+    group: "{{ interlink_service_group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ interlink_base_dir }}", mode: "0755" }
+    - { path: "{{ interlink_base_dir }}/work", mode: "0755" }
+    - { path: "{{ interlink_base_dir }}/bin", mode: "0755" }
+    - { path: "{{ interlink_base_dir }}/config", mode: "0755" }
+    - { path: "{{ interlink_base_dir }}/certs", mode: "0700" }
+    - { path: "{{ interlink_base_dir }}/logs", mode: "0755" }
+    - { path: "{{ interlink_data_dir }}", mode: "0700" }
+    - { path: "{{ interlink_data_dir }}/jobs", mode: "0700" }

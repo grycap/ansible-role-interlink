@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ interlink_node_name }}-smoke
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: {{ interlink_node_name }}
+  tolerations:
+    - key: virtual-node.interlink/no-schedule
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: test
+      image: busybox:1.35
+      command: ["sh", "-c"]
+      args:
+        - echo "hello from interLink via Slurm"; hostname; sleep 20
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "500m"
+          memory: "128Mi"
+  restartPolicy: Never

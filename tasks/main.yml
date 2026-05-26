@@ -1,0 +1,9 @@
+---
+- name: Validate InterLink deployment target
+  ansible.builtin.assert:
+    that:
+      - type_of_node in ['kubernetes', 'slurm']
+    fail_msg: "type_of_node must be 'kubernetes' or 'slurm'"
+
+- name: Include "{{ type_of_node }}" tasks
+  ansible.builtin.include_tasks: "{{ type_of_node }}.yml"

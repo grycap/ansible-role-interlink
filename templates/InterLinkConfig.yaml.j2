@@ -1,0 +1,12 @@
+InterlinkAddress: "https://0.0.0.0"
+InterlinkPort: "{{ interlink_port }}"
+SidecarURL: "{{ interlink_socket_url }}"
+SidecarPort: "0"
+VerboseLogging: true
+ErrorsOnlyLogging: false
+DataRootFolder: "{{ interlink_data_dir }}"
+TLS:
+  Enabled: true
+  CertFile: "{{ interlink_base_dir }}/certs/server-cert.pem"
+  KeyFile: "{{ interlink_base_dir }}/certs/server-key.pem"
+  CACertFile: "{{ interlink_base_dir }}/certs/ca.pem"

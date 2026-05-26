@@ -1,0 +1,25 @@
+---
+- name: Download interLink binaries
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ interlink_base_dir }}/bin/{{ item.src_name }}"
+    mode: "0755"
+  loop:
+    - src_name: interlink_Linux_x86_64
+      dest_name: interlink
+      url: "{{ interlink_release_base_url }}/interlink_Linux_x86_64"
+    - src_name: interlink-sidecar-slurm_Linux_x86_64
+      dest_name: interlink-sidecar-slurm
+      url: "{{ interlink_slurm_plugin_release_base_url }}/interlink-sidecar-slurm_Linux_x86_64"
+
+- name: Install interLink binaries
+  ansible.builtin.copy:
+    src: "{{ interlink_base_dir }}/bin/{{ item.src_name }}"
+    dest: "{{ interlink_base_dir }}/bin/{{ item.dest_name }}"
+    remote_src: true
+    mode: "0755"
+  loop:
+    - src_name: interlink_Linux_x86_64
+      dest_name: interlink
+    - src_name: interlink-sidecar-slurm_Linux_x86_64
+      dest_name: interlink-sidecar-slurm

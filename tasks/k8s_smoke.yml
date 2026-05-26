@@ -1,0 +1,28 @@
+- name: Template direct smoke pod manifest
+  ansible.builtin.template:
+    src: smoke-pod.yaml.j2
+    dest: "/tmp/{{ interlink_node_name }}-smoke-pod.yaml"
+    mode: "0644"
+
+- name: Apply direct smoke pod manifest
+  ansible.builtin.command:
+    cmd: "kubectl --kubeconfig={{ kubeconfig_path }} -n {{ interlink_namespace }} apply -f /tmp/{{ interlink_node_name }}-smoke-pod.yaml"
+  register: smoke_apply
+  changed_when: "'created' in smoke_apply.stdout or 'configured' in smoke_apply.stdout"
+
+- name: Wait for direct smoke pod to Succeed
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig={{ kubeconfig_path }} -n {{ interlink_namespace }}
+      wait --for=jsonpath='{.status.phase}'=Succeeded pod/{{ interlink_node_name }}-smoke --timeout=300s
+  changed_when: false
+
+- name: Collect direct smoke pod logs
+  ansible.builtin.command:
+    cmd: "kubectl --kubeconfig={{ kubeconfig_path }} -n {{ interlink_namespace }} logs {{ interlink_node_name }}-smoke"
+  changed_when: false
+  register: smoke_logs
+
+- name: Show direct smoke pod logs
+  ansible.builtin.debug:
+    var: smoke_logs.stdout_lines

@@ -1,0 +1,26 @@
+---
+- name: Flush handlers before validation
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start interLink Slurm plugin
+  ansible.builtin.systemd:
+    name: interlink-slurm-plugin.service
+    enabled: true
+    state: started
+
+- name: Enable and start interLink API
+  ansible.builtin.systemd:
+    name: interlink-api.service
+    enabled: true
+    state: started
+
+- name: Validate local mTLS pinglink
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:{{ interlink_port }}/pinglink"
+    method: GET
+    ca_path: "{{ interlink_base_dir }}/certs/ca.pem"
+    client_cert: "{{ interlink_base_dir }}/certs/client-cert.pem"
+    client_key: "{{ interlink_base_dir }}/certs/client-key.pem"
+    status_code: 200
+    return_content: true
+  changed_when: false

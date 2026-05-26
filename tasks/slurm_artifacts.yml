@@ -1,0 +1,20 @@
+---
+- name: Ensure local artifact directory exists on Ansible controller
+  ansible.builtin.file:
+    path: "{{ interlink_artifact_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+
+- name: Fetch client mTLS artifacts for Virtual Kubelet
+  ansible.builtin.fetch:
+    src: "{{ item.src }}"
+    dest: "{{ interlink_artifact_dir }}/{{ item.dest }}"
+    flat: true
+  loop:
+    - src: "{{ interlink_base_dir }}/certs/ca.pem"
+      dest: ca.crt
+    - src: "{{ interlink_base_dir }}/certs/client-cert.pem"
+      dest: tls.crt
+    - src: "{{ interlink_base_dir }}/certs/client-key.pem"
+      dest: tls.key
