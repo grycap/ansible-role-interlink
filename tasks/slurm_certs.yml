@@ -94,6 +94,13 @@
     ownca_create_subject_key_identifier: create_if_not_provided
     mode: "0644"
 
+- name: Set ownership and permissions for certs directory
+  ansible.builtin.file:
+    path: "{{ interlink_base_dir }}/certs"
+    owner: "{{ interlink_service_user }}"
+    group: "{{ interlink_service_group }}"
+    recursive: true
+
 - name: Lock down private key permissions
   ansible.builtin.file:
     path: "{{ item }}"
