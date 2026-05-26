@@ -99,7 +99,7 @@
     path: "{{ interlink_base_dir }}/certs"
     owner: "{{ interlink_service_user }}"
     group: "{{ interlink_service_group }}"
-    recursive: true
+    recurse: true
 
 - name: Lock down private key permissions
   ansible.builtin.file:
