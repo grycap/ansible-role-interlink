@@ -84,7 +84,7 @@
       rollout status deployment/{{ virtual_kubelet_deployment_name }} --timeout=180s
   changed_when: false
 
-- name: Get pending Virtual Kubelet CSRs
+- name: Wait for pending Virtual Kubelet CSRs
   ansible.builtin.shell: |
     kubectl --kubeconfig={{ kubeconfig_path }} get csr -o json | jq -r '
       .items[]
@@ -97,13 +97,15 @@
     executable: /bin/bash
   register: virtual_kubelet_csr_names
   changed_when: false
+  retries: "{{ interlink_virtual_kubelet_csr_wait_retries | default(20) }}"
+  delay: "{{ interlink_virtual_kubelet_csr_wait_delay | default(5) }}"
+  until: (virtual_kubelet_csr_names.stdout_lines | reject('equalto', '') | list | length) > 0
 
 - name: Approve pending Virtual Kubelet CSRs
   ansible.builtin.command:
     cmd: >-
       kubectl --kubeconfig={{ kubeconfig_path }} certificate approve {{ item }}
-  loop: "{{ virtual_kubelet_csr_names.stdout_lines }}"
-  when: virtual_kubelet_csr_names.stdout_lines | length > 0
+  loop: "{{ virtual_kubelet_csr_names.stdout_lines | reject('equalto', '') | list }}"
 
 - name: Wait for Virtual Kubelet node to be Ready
   ansible.builtin.command:
