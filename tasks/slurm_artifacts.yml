@@ -3,7 +3,7 @@
   ansible.builtin.file:
     path: "{{ interlink_artifact_dir }}"
     state: directory
-    mode: "0700"
+    mode: "0777"
   delegate_to: localhost
 
 - name: Fetch client mTLS artifacts for Virtual Kubelet
