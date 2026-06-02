@@ -1,0 +1,84 @@
+---
+- name: Detect Slurm worker capabilities
+  ansible.builtin.shell: |
+    set -euo pipefail
+
+    sinfo_args=(-h -N -o "%N|%c|%m|%G")
+    if [[ -n "${SLURM_CAPABILITY_NODE}" ]]; then
+      sinfo_args+=(-n "${SLURM_CAPABILITY_NODE}")
+    elif [[ -n "${SLURM_PARTITION}" ]]; then
+      sinfo_args+=(-p "${SLURM_PARTITION}")
+    fi
+
+    line="$(sinfo "${sinfo_args[@]}" \
+      | awk -F'|' '$2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ { print }' \
+      | sort -t'|' -k2,2nr -k3,3nr \
+      | head -n1)"
+
+    if [[ -z "${line}" ]]; then
+      echo "No Slurm worker capabilities found with sinfo" >&2
+      exit 1
+    fi
+
+    IFS='|' read -r node cpus memory_mb gres <<< "${line}"
+
+    gpu_model=""
+    gpu_count=0
+    if [[ "${gres}" =~ gpu:([^:,()]+):([0-9]+) ]]; then
+      gpu_model="${BASH_REMATCH[1]}"
+      gpu_count="${BASH_REMATCH[2]}"
+    elif [[ "${gres}" =~ gpu:([0-9]+) ]]; then
+      gpu_count="${BASH_REMATCH[1]}"
+    elif [[ "${gres}" =~ gpu=([0-9]+) ]]; then
+      gpu_count="${BASH_REMATCH[1]}"
+    fi
+
+    memory_gib=$(( memory_mb / 1024 ))
+    if [[ "${memory_gib}" -lt 1 ]]; then
+      memory_gib=1
+    fi
+
+    json_escape() {
+      printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+    }
+
+    printf '{"node":"%s","cpus":%s,"memory_mb":%s,"memory_gib":%s,"gres":"%s","gpu_model":"%s","gpu_count":%s}\n' \
+      "$(json_escape "${node}")" \
+      "${cpus}" \
+      "${memory_mb}" \
+      "${memory_gib}" \
+      "$(json_escape "${gres}")" \
+      "$(json_escape "${gpu_model}")" \
+      "${gpu_count}"
+  args:
+    executable: /bin/bash
+  environment:
+    SLURM_PARTITION: "{{ slurm_partition }}"
+    SLURM_CAPABILITY_NODE: "{{ interlink_slurm_capability_node }}"
+  register: interlink_slurm_capability_probe
+  changed_when: false
+
+- name: Store detected Slurm worker capabilities as facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capabilities: "{{ interlink_slurm_capability_probe.stdout | from_json }}"
+    interlink_slurm_capability_node_name: "{{ (interlink_slurm_capability_probe.stdout | from_json).node }}"
+    interlink_slurm_capability_cpus: "{{ (interlink_slurm_capability_probe.stdout | from_json).cpus }}"
+    interlink_slurm_capability_memory_mb: "{{ (interlink_slurm_capability_probe.stdout | from_json).memory_mb }}"
+    interlink_slurm_capability_memory_gib: "{{ (interlink_slurm_capability_probe.stdout | from_json).memory_gib }}"
+    interlink_slurm_capability_gres: "{{ (interlink_slurm_capability_probe.stdout | from_json).gres }}"
+    interlink_slurm_capability_gpu_model: "{{ (interlink_slurm_capability_probe.stdout | from_json).gpu_model }}"
+    interlink_slurm_capability_gpu_count: "{{ (interlink_slurm_capability_probe.stdout | from_json).gpu_count }}"
+
+- name: Write detected Slurm worker capabilities artifact
+  ansible.builtin.copy:
+    dest: "{{ interlink_base_dir }}/config/{{ interlink_slurm_capabilities_artifact_name }}"
+    mode: "0644"
+    content: |
+      ---
+      interlink_slurm_capability_node_name: "{{ interlink_slurm_capability_node_name }}"
+      interlink_slurm_capability_cpus: {{ interlink_slurm_capability_cpus }}
+      interlink_slurm_capability_memory_mb: {{ interlink_slurm_capability_memory_mb }}
+      interlink_slurm_capability_memory_gib: {{ interlink_slurm_capability_memory_gib }}
+      interlink_slurm_capability_gres: "{{ interlink_slurm_capability_gres }}"
+      interlink_slurm_capability_gpu_model: "{{ interlink_slurm_capability_gpu_model }}"
+      interlink_slurm_capability_gpu_count: {{ interlink_slurm_capability_gpu_count }}
