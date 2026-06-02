@@ -8,6 +8,10 @@
 - name: Include Slurm certificates
   ansible.builtin.include_tasks: slurm_certs.yml
 
+- name: Include Slurm capability detection
+  ansible.builtin.include_tasks: slurm_capabilities.yml
+  when: interlink_slurm_detect_capabilities | bool
+
 - name: Include Slurm configuration
   ansible.builtin.include_tasks: slurm_config.yml
 

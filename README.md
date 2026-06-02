@@ -81,6 +81,7 @@ Defaults are defined in `defaults/main.yml`.
 - `virtual_node_cpu` (default: `1`)
 - `virtual_node_memory_gib` (default: `1`)
 - `virtual_node_pods` (default: `10`)
+- `virtual_node_accelerators` (default: `[]`): explicit Helm `virtualNode.resources.accelerators` list. If unset and a Slurm capability artifact reports GPUs, the Kubernetes phase advertises `nvidia.com/gpu` automatically.
 - `virtual_kubelet_cpu_request` (default: `100m`)
 - `virtual_kubelet_cpu_limit` (default: `500m`)
 - `virtual_kubelet_memory_request` (default: `128Mi`)
@@ -92,6 +93,21 @@ Defaults are defined in `defaults/main.yml`.
 - `slurm_default_cpu` (default: `1`)
 - `slurm_default_memory` (default: `1G`)
 - `slurm_job_time` (default: `00:10:00`)
+- `slurm_extra_flags` (default: `[]`)
+- `interlink_slurm_detect_capabilities` (default: `true`): probe Slurm workers with `sinfo` during the Slurm phase and export detected CPU, memory, GRES, GPU model, and GPU count as `slurm-capabilities.yml`.
+- `interlink_slurm_capability_node` (default: empty): optional Slurm node name to probe. If empty, the role selects the largest node in `slurm_partition`.
+- `interlink_slurm_capabilities_file` (default: `{{ interlink_artifact_dir }}/slurm-capabilities.yml`)
+- `slurm_gpu_enabled` (default: `true`)
+- `slurm_gpu_flavor` (default: `{{ slurm_partition }}-gpu`)
+- `slurm_gpu_partition` (default: `{{ slurm_partition }}`)
+- `slurm_gpu_count` (default: detected GPU count, falling back to `0`)
+- `slurm_gpu_model` (default: detected GPU model, falling back to empty)
+- `slurm_gpu_default_cpu` (default: detected Slurm worker CPUs, falling back to `slurm_default_cpu`)
+- `slurm_gpu_default_memory` (default: detected Slurm worker memory in MB, falling back to `slurm_default_memory`)
+- `slurm_gpu_gres` (default: generated from detected GPU model and count, for example `gpu:h100:1`)
+- `slurm_gpu_extra_flags` (default: `[]`)
+
+When `interlink_slurm_detect_capabilities` is enabled, the Slurm phase writes a local capability artifact after probing `sinfo`. The Kubernetes phase loads that artifact and advertises the detected CPU and memory as virtual-node capacity; if a GPU GRES such as `gpu:h100:1` is present, it advertises one `nvidia.com/gpu` accelerator with model `h100` and adds a GPU Slurm flavor using `--gres=gpu:h100:1`. Memory is converted from Slurm MB to whole GiB for the Helm chart, rounded down to avoid overcommitting.
 
 ## Recommended Deployment Flow
 
@@ -148,4 +164,3 @@ The Kubernetes phase consumes artifacts exported by the Slurm phase from `interl
 ## License
 
 Apache-2.0
-

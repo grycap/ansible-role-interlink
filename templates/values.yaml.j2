@@ -3,9 +3,23 @@ nodeName: {{ interlink_node_name }}
 virtualNode:
   image: {{ virtual_kubelet_image }}
   resources:
-    CPUs: {{ virtual_node_cpu }}
-    memGiB: {{ virtual_node_memory_gib }}
+    CPUs: {{ interlink_slurm_capability_cpus | default(virtual_node_cpu) }}
+    memGiB: {{ interlink_slurm_capability_memory_gib | default(virtual_node_memory_gib) }}
     pods: {{ virtual_node_pods }}
+{% set detected_gpu_count = interlink_slurm_capability_gpu_count | default(0) | int %}
+{% if virtual_node_accelerators | length > 0 %}
+    accelerators:
+{% for accelerator in virtual_node_accelerators %}
+    - resourceType: "{{ accelerator.resourceType }}"
+      model: "{{ accelerator.model }}"
+      available: {{ accelerator.available }}
+{% endfor %}
+{% elif detected_gpu_count > 0 %}
+    accelerators:
+    - resourceType: nvidia.com/gpu
+      model: "{{ interlink_slurm_capability_gpu_model | default('gpu') }}"
+      available: {{ detected_gpu_count }}
+{% endif %}
   HTTP:
     insecure: true
     CACert: ""

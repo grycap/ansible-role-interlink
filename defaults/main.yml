@@ -33,10 +33,27 @@ slurm_partition: debug
 slurm_default_cpu: 1
 slurm_default_memory: 1G
 slurm_job_time: "00:10:00"
+slurm_extra_flags: []
+
+interlink_slurm_detect_capabilities: true
+interlink_slurm_capability_node: ""
+interlink_slurm_capabilities_artifact_name: slurm-capabilities.yml
+interlink_slurm_capabilities_file: "{{ interlink_artifact_dir }}/{{ interlink_slurm_capabilities_artifact_name }}"
+
+slurm_gpu_enabled: true
+slurm_gpu_flavor: "{{ slurm_partition }}-gpu"
+slurm_gpu_partition: "{{ slurm_partition }}"
+slurm_gpu_count: "{{ interlink_slurm_capability_gpu_count | default(0) }}"
+slurm_gpu_model: "{{ interlink_slurm_capability_gpu_model | default('') }}"
+slurm_gpu_default_cpu: "{{ interlink_slurm_capability_cpus | default(slurm_default_cpu) }}"
+slurm_gpu_default_memory: "{{ (interlink_slurm_capability_memory_mb | string) ~ 'M' if interlink_slurm_capability_memory_mb is defined else slurm_default_memory }}"
+slurm_gpu_gres: ""
+slurm_gpu_extra_flags: []
 
 virtual_node_cpu: 1
 virtual_node_memory_gib: 1
 virtual_node_pods: 10
+virtual_node_accelerators: []
 virtual_kubelet_cpu_request: 100m
 virtual_kubelet_cpu_limit: 500m
 virtual_kubelet_memory_request: 128Mi
