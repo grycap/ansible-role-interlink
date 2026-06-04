@@ -94,8 +94,8 @@ Defaults are defined in `defaults/main.yml`.
 - `slurm_default_memory` (default: `1G`)
 - `slurm_job_time` (default: `00:10:00`)
 - `slurm_extra_flags` (default: `[]`)
-- `interlink_slurm_detect_capabilities` (default: `true`): probe Slurm workers with `sinfo` during the Slurm phase and export detected CPU, memory, GRES, GPU model, and GPU count as `slurm-capabilities.yml`.
-- `interlink_slurm_capability_node` (default: empty): optional Slurm node name to probe. If empty, the role selects the largest node in `slurm_partition`.
+- `interlink_slurm_detect_capabilities` (default: `true`): derive node CPU, memory, and GPU metadata from Ansible facts during the Slurm phase and export them as `slurm-capabilities.yml`.
+- `interlink_slurm_capability_node` (default: empty): optional node name override written to the exported capability artifact.
 - `interlink_slurm_capabilities_file` (default: `{{ interlink_artifact_dir }}/slurm-capabilities.yml`)
 - `slurm_gpu_enabled` (default: `true`)
 - `slurm_gpu_flavor` (default: `{{ slurm_partition }}-gpu`)
@@ -107,7 +107,7 @@ Defaults are defined in `defaults/main.yml`.
 - `slurm_gpu_gres` (default: generated from detected GPU model and count, for example `gpu:h100:1`)
 - `slurm_gpu_extra_flags` (default: `[]`)
 
-When `interlink_slurm_detect_capabilities` is enabled, the Slurm phase writes a local capability artifact after probing `sinfo`. The Kubernetes phase loads that artifact and advertises the detected CPU and memory as virtual-node capacity; if a GPU GRES such as `gpu:h100:1` is present, it advertises one `nvidia.com/gpu` accelerator with model `h100` and adds a GPU Slurm flavor using `--gres=gpu:h100:1`. Memory is converted from Slurm MB to whole GiB for the Helm chart, rounded down to avoid overcommitting.
+When `interlink_slurm_detect_capabilities` is enabled, the Slurm phase writes a local capability artifact derived from Ansible hardware facts. The Kubernetes phase loads that artifact and advertises the detected CPU and memory as virtual-node capacity; if GPUs are detected in facts, it advertises `nvidia.com/gpu` accelerators and can add a GPU Slurm flavor with `--gres=gpu:<count>`. Memory is converted from MB to whole GiB for the Helm chart, rounded down to avoid overcommitting.
 
 ## Recommended Deployment Flow
 
