@@ -17,6 +17,9 @@
       {{ (ansible_facts.graphics | default({})).cards
       | default((ansible_facts.graphics | default({})).devices)
       | default([]) }}
+
+- name: Select GPU capability facts source
+  ansible.builtin.set_fact:
     interlink_slurm_gpu_devices: >-
       {{ ansible_facts.gpus
       | default(interlink_slurm_gpu_devices_from_graphics)
@@ -58,13 +61,25 @@
     interlink_slurm_capability_gpu_model_slug: >-
       {{ interlink_slurm_capability_gpu_model
       | lower
-      | regex_replace('[^a-z0-9]+', '_')
-      | regex_replace('^_+|_+$', '') }}
+      | replace(' ', '_')
+      | replace('-', '_')
+      | replace('/', '_')
+      | replace('.', '_')
+      | replace(':', '_')
+      | replace('(', '')
+      | replace(')', '')
+      | replace('__', '_') }}
+
+- name: Store derived Slurm GPU GRES metadata
+  ansible.builtin.set_fact:
     interlink_slurm_capability_gres: >-
       {{ 'gpu:' ~ interlink_slurm_capability_gpu_model_slug ~ ':' ~ (interlink_slurm_capability_gpu_count | int)
       if (interlink_slurm_capability_gpu_count | int) > 0 and (interlink_slurm_capability_gpu_model_slug | length) > 0
       else ('gpu:' ~ (interlink_slurm_capability_gpu_count | int)
       if (interlink_slurm_capability_gpu_count | int) > 0 else '') }}
+
+- name: Store derived Slurm worker capabilities
+  ansible.builtin.set_fact:
     interlink_slurm_capabilities:
       node: "{{ interlink_slurm_capability_node_name }}"
       cpus: "{{ interlink_slurm_capability_cpus | int }}"
