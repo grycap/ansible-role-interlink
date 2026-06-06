@@ -1,29 +1,80 @@
 ---
-- name: Derive Slurm worker capabilities from Ansible facts
+- name: Select Slurm worker inventory hosts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_worker_group_hosts: "{{ groups[interlink_slurm_capability_worker_group | default('slurm_workers')] | default([]) }}"
+
+- name: Select Slurm worker host for capability facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_worker_host_effective: >-
+      {{ interlink_slurm_capability_worker_host | default('')
+      if (interlink_slurm_capability_worker_host | default('') | length) > 0
+      else (interlink_slurm_capability_worker_group_hosts | first | default('')) }}
+
+- name: Ensure a Slurm worker host is available for capability facts
+  ansible.builtin.assert:
+    that:
+      - interlink_slurm_capability_worker_host_effective | length > 0
+    fail_msg: >-
+      interlink_slurm_detect_capabilities is enabled, but no Slurm worker host
+      was configured. Set interlink_slurm_capability_worker_host or add a host
+      to the {{ interlink_slurm_capability_worker_group | default('slurm_workers') }} inventory group.
+
+- name: Gather capability facts from Slurm worker
+  ansible.builtin.setup:
+  delegate_to: "{{ interlink_slurm_capability_worker_host_effective }}"
+  delegate_facts: true
+  register: interlink_slurm_worker_setup
+
+- name: Store Slurm worker facts
+  ansible.builtin.set_fact:
+    interlink_slurm_worker_facts: "{{ interlink_slurm_worker_setup.ansible_facts | default({}) }}"
+
+- name: Normalize Slurm worker hardware facts
+  ansible.builtin.set_fact:
+    interlink_slurm_worker_node_name: >-
+      {{ interlink_slurm_worker_facts.nodename
+      | default(interlink_slurm_worker_facts.ansible_nodename)
+      | default(interlink_slurm_capability_worker_host_effective) }}
+    interlink_slurm_worker_cpus: >-
+      {{ interlink_slurm_worker_facts.processor_vcpus
+      | default(interlink_slurm_worker_facts.ansible_processor_vcpus)
+      | default(interlink_slurm_worker_facts.processor_nproc)
+      | default(interlink_slurm_worker_facts.ansible_processor_nproc)
+      | default(slurm_default_cpu)
+      | int }}
+    interlink_slurm_worker_memory_mb: >-
+      {{ interlink_slurm_worker_facts.memtotal_mb
+      | default(interlink_slurm_worker_facts.ansible_memtotal_mb)
+      | default(1024)
+      | int }}
+    interlink_slurm_worker_graphics: >-
+      {{ interlink_slurm_worker_facts.graphics
+      | default(interlink_slurm_worker_facts.ansible_graphics)
+      | default({}) }}
+    interlink_slurm_worker_local_facts: >-
+      {{ interlink_slurm_worker_facts.ansible_local
+      | default(interlink_slurm_worker_facts.local)
+      | default({}) }}
+
+- name: Derive Slurm worker capabilities from worker facts
   ansible.builtin.set_fact:
     interlink_slurm_capability_node_name: >-
       {{ interlink_slurm_capability_node if interlink_slurm_capability_node != ""
-      else ansible_facts.nodename | default(inventory_hostname) }}
-    interlink_slurm_capability_cpus: >-
-      {{ ansible_facts.processor_vcpus
-      | default(ansible_facts.processor_nproc)
-      | default(slurm_default_cpu)
-      | int }}
-    interlink_slurm_capability_memory_mb: >-
-      {{ ansible_facts.memtotal_mb
-      | default(1024)
-      | int }}
+      else interlink_slurm_worker_node_name }}
+    interlink_slurm_capability_cpus: "{{ interlink_slurm_worker_cpus | int }}"
+    interlink_slurm_capability_memory_mb: "{{ interlink_slurm_worker_memory_mb | int }}"
     interlink_slurm_gpu_devices_from_graphics: >-
-      {{ (ansible_facts.graphics | default({})).cards
-      | default((ansible_facts.graphics | default({})).devices)
+      {{ interlink_slurm_worker_graphics.cards
+      | default(interlink_slurm_worker_graphics.devices)
       | default([]) }}
 
 - name: Select GPU capability facts source
   ansible.builtin.set_fact:
     interlink_slurm_gpu_devices: >-
-      {{ ansible_facts.gpus
+      {{ interlink_slurm_worker_facts.gpus
+      | default(interlink_slurm_worker_facts.ansible_gpus)
       | default(interlink_slurm_gpu_devices_from_graphics)
-      | default((ansible_local.gpu | default({})).devices)
+      | default((interlink_slurm_worker_local_facts.gpu | default({})).devices)
       | default([]) }}
 
 - name: Initialize GPU capabilities derived from facts
