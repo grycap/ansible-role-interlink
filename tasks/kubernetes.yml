@@ -9,6 +9,9 @@
     - tls.key
   register: interlink_artifacts_stat
   delegate_to: localhost
+  retries: "{{ interlink_artifacts_wait_retries }}"
+  delay: "{{ interlink_artifacts_wait_delay }}"
+  until: interlink_artifacts_stat.stat.exists
 
 - name: Ensure client mTLS artifacts are available
   ansible.builtin.assert:
@@ -17,6 +20,26 @@
     fail_msg: >-
       Missing mTLS artifacts under {{ interlink_artifact_dir }}.
       Run the role first on the Slurm host (interlink_type_of_node=slurm).
+
+- name: Check detected Slurm worker capabilities on Ansible controller
+  ansible.builtin.stat:
+    path: "{{ interlink_slurm_capabilities_file }}"
+  register: interlink_slurm_capabilities_stat
+  delegate_to: localhost
+
+- name: Load detected Slurm worker capabilities
+  ansible.builtin.include_vars:
+    file: "{{ interlink_slurm_capabilities_file }}"
+  when: interlink_slurm_capabilities_stat.stat.exists
+
+- name: Report missing Slurm worker capabilities artifact
+  ansible.builtin.debug:
+    msg: >-
+      Slurm capability artifact {{ interlink_slurm_capabilities_file }} was not found.
+      Falling back to virtual_node_* and slurm_* defaults.
+  when:
+    - interlink_slurm_detect_capabilities | bool
+    - not interlink_slurm_capabilities_stat.stat.exists
 
 - name: Ensure remote certificate directory exists
   ansible.builtin.file:

@@ -1,0 +1,175 @@
+---
+- name: Select Slurm worker inventory hosts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_worker_group_hosts: "{{ groups[interlink_slurm_capability_worker_group | default('slurm_workers')] | default([]) }}"
+    interlink_slurm_capability_inventory_hosts: "{{ groups.all | default(ansible_play_hosts_all | default([])) }}"
+
+- name: Infer Slurm worker hosts from inventory facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_inferred_worker_hosts: "{{ (interlink_slurm_capability_inferred_worker_hosts | default([])) + [item] }}"
+  loop: "{{ interlink_slurm_capability_inventory_hosts }}"
+  vars:
+    interlink_slurm_capability_candidate_hostvars: "{{ hostvars[item] | default({}) }}"
+    interlink_slurm_capability_candidate_facts: "{{ interlink_slurm_capability_candidate_hostvars.ansible_facts | default({}) }}"
+    interlink_slurm_capability_candidate_identity: >-
+      {{ (item ~ ' '
+      ~ (interlink_slurm_capability_candidate_hostvars.ansible_host | default('')) ~ ' '
+      ~ (interlink_slurm_capability_candidate_hostvars.ansible_nodename | default('')) ~ ' '
+      ~ (interlink_slurm_capability_candidate_facts.nodename | default(''))) | lower }}
+  when:
+    - item != inventory_hostname
+    - "'slurm-wn' in interlink_slurm_capability_candidate_identity or 'slurm_wn' in interlink_slurm_capability_candidate_identity"
+
+- name: Select Slurm worker host for capability facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_worker_host_effective: >-
+      {{ interlink_slurm_capability_worker_host | default('')
+      if (interlink_slurm_capability_worker_host | default('') | length) > 0
+      else (interlink_slurm_capability_worker_group_hosts | first
+      | default((interlink_slurm_capability_inferred_worker_hosts | default([])) | first | default(''))) }}
+
+- name: Ensure a Slurm worker host is available for capability facts
+  ansible.builtin.assert:
+    that:
+      - interlink_slurm_capability_worker_host_effective | length > 0
+    fail_msg: >-
+      interlink_slurm_detect_capabilities is enabled, but no Slurm worker host
+      was configured. Set interlink_slurm_capability_worker_host or add a host
+      to the {{ interlink_slurm_capability_worker_group | default('slurm_workers') }} inventory group.
+      If using automatic inference, ensure the worker inventory host or gathered
+      nodename contains slurm-wn.
+
+- name: Gather capability facts from Slurm worker
+  ansible.builtin.setup:
+  delegate_to: "{{ interlink_slurm_capability_worker_host_effective }}"
+  delegate_facts: true
+  register: interlink_slurm_worker_setup
+
+- name: Store Slurm worker facts
+  ansible.builtin.set_fact:
+    interlink_slurm_worker_facts: "{{ interlink_slurm_worker_setup.ansible_facts | default({}) }}"
+
+- name: Normalize Slurm worker hardware facts
+  ansible.builtin.set_fact:
+    interlink_slurm_worker_node_name: >-
+      {{ interlink_slurm_worker_facts.nodename
+      | default(interlink_slurm_worker_facts.ansible_nodename)
+      | default(interlink_slurm_capability_worker_host_effective) }}
+    interlink_slurm_worker_cpus: >-
+      {{ interlink_slurm_worker_facts.processor_vcpus
+      | default(interlink_slurm_worker_facts.ansible_processor_vcpus)
+      | default(interlink_slurm_worker_facts.processor_nproc)
+      | default(interlink_slurm_worker_facts.ansible_processor_nproc)
+      | default(slurm_default_cpu)
+      | int }}
+    interlink_slurm_worker_memory_mb: >-
+      {{ interlink_slurm_worker_facts.memtotal_mb
+      | default(interlink_slurm_worker_facts.ansible_memtotal_mb)
+      | default(1024)
+      | int }}
+    interlink_slurm_worker_graphics: >-
+      {{ interlink_slurm_worker_facts.graphics
+      | default(interlink_slurm_worker_facts.ansible_graphics)
+      | default({}) }}
+    interlink_slurm_worker_local_facts: >-
+      {{ interlink_slurm_worker_facts.ansible_local
+      | default(interlink_slurm_worker_facts.local)
+      | default({}) }}
+
+- name: Derive Slurm worker capabilities from worker facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_node_name: >-
+      {{ interlink_slurm_capability_node if interlink_slurm_capability_node != ""
+      else interlink_slurm_worker_node_name }}
+    interlink_slurm_capability_cpus: "{{ interlink_slurm_worker_cpus | int }}"
+    interlink_slurm_capability_memory_mb: "{{ interlink_slurm_worker_memory_mb | int }}"
+    interlink_slurm_gpu_devices_from_graphics: >-
+      {{ interlink_slurm_worker_graphics.cards
+      | default(interlink_slurm_worker_graphics.devices)
+      | default([]) }}
+
+- name: Select GPU capability facts source
+  ansible.builtin.set_fact:
+    interlink_slurm_gpu_devices: >-
+      {{ interlink_slurm_worker_facts.gpus
+      | default(interlink_slurm_worker_facts.ansible_gpus)
+      | default(interlink_slurm_gpu_devices_from_graphics)
+      | default((interlink_slurm_worker_local_facts.gpu | default({})).devices)
+      | default([]) }}
+
+- name: Initialize GPU capabilities derived from facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_gpu_count: 0
+    interlink_slurm_capability_gpu_model: ""
+
+- name: Aggregate GPU capabilities from available facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_gpu_count: >-
+      {{ (interlink_slurm_capability_gpu_count | int)
+      + item_gpu_count }}
+    interlink_slurm_capability_gpu_model: >-
+      {{ interlink_slurm_capability_gpu_model
+      if (interlink_slurm_capability_gpu_model | length) > 0
+      else item_gpu_model }}
+  loop: "{{ interlink_slurm_gpu_devices }}"
+  vars:
+    item_gpu_count: >-
+      {{ item.count
+      | default(item.quantity)
+      | default(item.num)
+      | default(1)
+      | int }}
+    item_gpu_model: >-
+      {{ item.model
+      | default(item.name)
+      | default(item.product)
+      | default(item.device)
+      | default('') }}
+
+- name: Store derived Slurm worker capability metadata
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_memory_gib: "{{ [1, (interlink_slurm_capability_memory_mb | int // 1024)] | max }}"
+    interlink_slurm_capability_gpu_model_slug: >-
+      {{ interlink_slurm_capability_gpu_model
+      | lower
+      | replace(' ', '_')
+      | replace('-', '_')
+      | replace('/', '_')
+      | replace('.', '_')
+      | replace(':', '_')
+      | replace('(', '')
+      | replace(')', '')
+      | replace('__', '_') }}
+
+- name: Store derived Slurm GPU GRES metadata
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_gres: >-
+      {{ 'gpu:' ~ interlink_slurm_capability_gpu_model_slug ~ ':' ~ (interlink_slurm_capability_gpu_count | int)
+      if (interlink_slurm_capability_gpu_count | int) > 0 and (interlink_slurm_capability_gpu_model_slug | length) > 0
+      else ('gpu:' ~ (interlink_slurm_capability_gpu_count | int)
+      if (interlink_slurm_capability_gpu_count | int) > 0 else '') }}
+
+- name: Store derived Slurm worker capabilities
+  ansible.builtin.set_fact:
+    interlink_slurm_capabilities:
+      node: "{{ interlink_slurm_capability_node_name }}"
+      cpus: "{{ interlink_slurm_capability_cpus | int }}"
+      memory_mb: "{{ interlink_slurm_capability_memory_mb | int }}"
+      memory_gib: "{{ interlink_slurm_capability_memory_gib | int }}"
+      gres: "{{ interlink_slurm_capability_gres }}"
+      gpu_model: "{{ interlink_slurm_capability_gpu_model }}"
+      gpu_count: "{{ interlink_slurm_capability_gpu_count | int }}"
+
+- name: Write detected Slurm worker capabilities artifact
+  ansible.builtin.copy:
+    dest: "{{ interlink_base_dir }}/config/{{ interlink_slurm_capabilities_artifact_name }}"
+    mode: "0644"
+    content: |
+      ---
+      interlink_slurm_capability_node_name: "{{ interlink_slurm_capability_node_name }}"
+      interlink_slurm_capability_cpus: {{ interlink_slurm_capability_cpus }}
+      interlink_slurm_capability_memory_mb: {{ interlink_slurm_capability_memory_mb }}
+      interlink_slurm_capability_memory_gib: {{ interlink_slurm_capability_memory_gib }}
+      interlink_slurm_capability_gres: "{{ interlink_slurm_capability_gres }}"
+      interlink_slurm_capability_gpu_model: "{{ interlink_slurm_capability_gpu_model }}"
+      interlink_slurm_capability_gpu_count: {{ interlink_slurm_capability_gpu_count }}

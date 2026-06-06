@@ -27,3 +27,23 @@ Flavors:
     SlurmFlags:
       - "--partition={{ slurm_partition }}"
       - "--time={{ slurm_job_time }}"
+{% for flag in slurm_extra_flags %}
+      - "{{ flag }}"
+{% endfor %}
+{% set effective_gpu_count = slurm_gpu_count | int %}
+{% if slurm_gpu_enabled | bool and (effective_gpu_count > 0 or slurm_gpu_gres | length > 0) %}
+{% set effective_gpu_model = slurm_gpu_model | default('') %}
+{% set effective_gpu_gres = slurm_gpu_gres if slurm_gpu_gres | length > 0 else ('gpu:' ~ effective_gpu_model ~ ':' ~ effective_gpu_count if effective_gpu_model | length > 0 else 'gpu:' ~ effective_gpu_count) %}
+  {{ slurm_gpu_flavor }}:
+    Name: "{{ slurm_gpu_flavor }}"
+    Description: "GPU Slurm {{ slurm_gpu_partition }} partition"
+    CPUDefault: {{ slurm_gpu_default_cpu }}
+    MemoryDefault: "{{ slurm_gpu_default_memory }}"
+    SlurmFlags:
+      - "--partition={{ slurm_gpu_partition }}"
+      - "--time={{ slurm_job_time }}"
+      - "--gres={{ effective_gpu_gres }}"
+{% for flag in slurm_gpu_extra_flags %}
+      - "{{ flag }}"
+{% endfor %}
+{% endif %}

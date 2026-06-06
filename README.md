@@ -81,6 +81,7 @@ Defaults are defined in `defaults/main.yml`.
 - `virtual_node_cpu` (default: `1`)
 - `virtual_node_memory_gib` (default: `1`)
 - `virtual_node_pods` (default: `10`)
+- `virtual_node_accelerators` (default: `[]`): explicit Helm `virtualNode.resources.accelerators` list. If unset and a Slurm capability artifact reports GPUs, the Kubernetes phase advertises `nvidia.com/gpu` automatically.
 - `virtual_kubelet_cpu_request` (default: `100m`)
 - `virtual_kubelet_cpu_limit` (default: `500m`)
 - `virtual_kubelet_memory_request` (default: `128Mi`)
@@ -92,6 +93,25 @@ Defaults are defined in `defaults/main.yml`.
 - `slurm_default_cpu` (default: `1`)
 - `slurm_default_memory` (default: `1G`)
 - `slurm_job_time` (default: `00:10:00`)
+- `slurm_extra_flags` (default: `[]`)
+- `interlink_slurm_detect_capabilities` (default: `true`): derive node CPU, memory, and GPU metadata from Ansible facts gathered on a Slurm worker and export them as `slurm-capabilities.yml`.
+- `interlink_slurm_capability_node` (default: empty): optional node name override written to the exported capability artifact.
+- `interlink_slurm_capability_worker_host` (default: empty): explicit inventory host delegated for Slurm worker fact gathering.
+- `interlink_slurm_capability_worker_group` (default: `slurm_workers`): inventory group used when `interlink_slurm_capability_worker_host` is empty; the first host in the group is used. If the group is absent, the role tries to infer a worker from inventory hosts or gathered nodenames containing `slurm-wn`.
+- `interlink_slurm_capabilities_file` (default: `{{ interlink_artifact_dir }}/slurm-capabilities.yml`)
+- `interlink_artifacts_wait_retries` (default: `60`): Kubernetes-side retries while waiting for Slurm-side mTLS artifacts.
+- `interlink_artifacts_wait_delay` (default: `10`): seconds between Slurm-side artifact checks.
+- `slurm_gpu_enabled` (default: `true`)
+- `slurm_gpu_flavor` (default: `{{ slurm_partition }}-gpu`)
+- `slurm_gpu_partition` (default: `{{ slurm_partition }}`)
+- `slurm_gpu_count` (default: detected GPU count, falling back to `0`)
+- `slurm_gpu_model` (default: detected GPU model, falling back to empty)
+- `slurm_gpu_default_cpu` (default: detected Slurm worker CPUs, falling back to `slurm_default_cpu`)
+- `slurm_gpu_default_memory` (default: detected Slurm worker memory in MB, falling back to `slurm_default_memory`)
+- `slurm_gpu_gres` (default: generated from detected GPU model and count, for example `gpu:h100:1`)
+- `slurm_gpu_extra_flags` (default: `[]`)
+
+When `interlink_slurm_detect_capabilities` is enabled, the Slurm phase writes a local capability artifact derived from Ansible hardware facts gathered on a Slurm worker. The Kubernetes phase loads that artifact and advertises the detected CPU and memory as virtual-node capacity; if GPUs are detected in worker facts, it advertises `nvidia.com/gpu` accelerators and can add a GPU Slurm flavor with `--gres=gpu:<count>`. Memory is converted from MB to whole GiB for the Helm chart, rounded down to avoid overcommitting.
 
 ## Recommended Deployment Flow
 
@@ -148,4 +168,3 @@ The Kubernetes phase consumes artifacts exported by the Slurm phase from `interl
 ## License
 
 Apache-2.0
-

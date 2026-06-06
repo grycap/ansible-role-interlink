@@ -18,3 +18,10 @@
       dest: tls.crt
     - src: "{{ interlink_base_dir }}/certs/client-key.pem"
       dest: tls.key
+
+- name: Fetch detected Slurm worker capabilities for Virtual Kubelet
+  ansible.builtin.fetch:
+    src: "{{ interlink_base_dir }}/config/{{ interlink_slurm_capabilities_artifact_name }}"
+    dest: "{{ interlink_slurm_capabilities_file }}"
+    flat: true
+  when: interlink_slurm_detect_capabilities | bool
