@@ -97,8 +97,10 @@ Defaults are defined in `defaults/main.yml`.
 - `interlink_slurm_detect_capabilities` (default: `true`): derive node CPU, memory, and GPU metadata from Ansible facts gathered on a Slurm worker and export them as `slurm-capabilities.yml`.
 - `interlink_slurm_capability_node` (default: empty): optional node name override written to the exported capability artifact.
 - `interlink_slurm_capability_worker_host` (default: empty): explicit inventory host delegated for Slurm worker fact gathering.
-- `interlink_slurm_capability_worker_group` (default: `slurm_workers`): inventory group used when `interlink_slurm_capability_worker_host` is empty; the first host in the group is used.
+- `interlink_slurm_capability_worker_group` (default: `slurm_workers`): inventory group used when `interlink_slurm_capability_worker_host` is empty; the first host in the group is used. If the group is absent, the role tries to infer a worker from inventory hosts or gathered nodenames containing `slurm-wn`.
 - `interlink_slurm_capabilities_file` (default: `{{ interlink_artifact_dir }}/slurm-capabilities.yml`)
+- `interlink_artifacts_wait_retries` (default: `60`): Kubernetes-side retries while waiting for Slurm-side mTLS artifacts.
+- `interlink_artifacts_wait_delay` (default: `10`): seconds between Slurm-side artifact checks.
 - `slurm_gpu_enabled` (default: `true`)
 - `slurm_gpu_flavor` (default: `{{ slurm_partition }}-gpu`)
 - `slurm_gpu_partition` (default: `{{ slurm_partition }}`)

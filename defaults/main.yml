@@ -41,6 +41,8 @@ interlink_slurm_capability_worker_host: ""
 interlink_slurm_capability_worker_group: slurm_workers
 interlink_slurm_capabilities_artifact_name: slurm-capabilities.yml
 interlink_slurm_capabilities_file: "{{ interlink_artifact_dir }}/{{ interlink_slurm_capabilities_artifact_name }}"
+interlink_artifacts_wait_retries: 60
+interlink_artifacts_wait_delay: 10
 
 slurm_gpu_enabled: true
 slurm_gpu_flavor: "{{ slurm_partition }}-gpu"

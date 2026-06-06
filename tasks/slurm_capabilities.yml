@@ -2,13 +2,31 @@
 - name: Select Slurm worker inventory hosts
   ansible.builtin.set_fact:
     interlink_slurm_capability_worker_group_hosts: "{{ groups[interlink_slurm_capability_worker_group | default('slurm_workers')] | default([]) }}"
+    interlink_slurm_capability_inventory_hosts: "{{ groups.all | default(ansible_play_hosts_all | default([])) }}"
+
+- name: Infer Slurm worker hosts from inventory facts
+  ansible.builtin.set_fact:
+    interlink_slurm_capability_inferred_worker_hosts: "{{ (interlink_slurm_capability_inferred_worker_hosts | default([])) + [item] }}"
+  loop: "{{ interlink_slurm_capability_inventory_hosts }}"
+  vars:
+    interlink_slurm_capability_candidate_hostvars: "{{ hostvars[item] | default({}) }}"
+    interlink_slurm_capability_candidate_facts: "{{ interlink_slurm_capability_candidate_hostvars.ansible_facts | default({}) }}"
+    interlink_slurm_capability_candidate_identity: >-
+      {{ (item ~ ' '
+      ~ (interlink_slurm_capability_candidate_hostvars.ansible_host | default('')) ~ ' '
+      ~ (interlink_slurm_capability_candidate_hostvars.ansible_nodename | default('')) ~ ' '
+      ~ (interlink_slurm_capability_candidate_facts.nodename | default(''))) | lower }}
+  when:
+    - item != inventory_hostname
+    - "'slurm-wn' in interlink_slurm_capability_candidate_identity or 'slurm_wn' in interlink_slurm_capability_candidate_identity"
 
 - name: Select Slurm worker host for capability facts
   ansible.builtin.set_fact:
     interlink_slurm_capability_worker_host_effective: >-
       {{ interlink_slurm_capability_worker_host | default('')
       if (interlink_slurm_capability_worker_host | default('') | length) > 0
-      else (interlink_slurm_capability_worker_group_hosts | first | default('')) }}
+      else (interlink_slurm_capability_worker_group_hosts | first
+      | default((interlink_slurm_capability_inferred_worker_hosts | default([])) | first | default(''))) }}
 
 - name: Ensure a Slurm worker host is available for capability facts
   ansible.builtin.assert:
@@ -18,6 +36,8 @@
       interlink_slurm_detect_capabilities is enabled, but no Slurm worker host
       was configured. Set interlink_slurm_capability_worker_host or add a host
       to the {{ interlink_slurm_capability_worker_group | default('slurm_workers') }} inventory group.
+      If using automatic inference, ensure the worker inventory host or gathered
+      nodename contains slurm-wn.
 
 - name: Gather capability facts from Slurm worker
   ansible.builtin.setup:

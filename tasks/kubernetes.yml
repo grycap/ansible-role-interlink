@@ -9,6 +9,9 @@
     - tls.key
   register: interlink_artifacts_stat
   delegate_to: localhost
+  retries: "{{ interlink_artifacts_wait_retries }}"
+  delay: "{{ interlink_artifacts_wait_delay }}"
+  until: interlink_artifacts_stat.stat.exists
 
 - name: Ensure client mTLS artifacts are available
   ansible.builtin.assert:
